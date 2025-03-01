@@ -1,0 +1,71 @@
+// db.js - Database connection setup
+const mongoose = require('mongoose');
+
+mongoose.connect('mongodb://localhost:27017/auctionDB', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+}).then(() => console.log('Database connected'))
+  .catch(err => console.log(err));
+
+module.exports = mongoose;
+
+// models.js - User and Auction Models
+const bcrypt = require('bcrypt');
+const { Schema, model } = require('mongoose');
+
+const userSchema = new Schema({
+  username: String,
+  email: String,
+  password: String,
+});
+
+// Hash password before saving
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+const auctionSchema = new Schema({
+  title: String,
+  description: String,
+  startingBid: Number,
+  currentBid: Number,
+  createdAt: { type: Date, default: Date.now },
+});
+
+const User = model('User', userSchema);
+const Auction = model('Auction', auctionSchema);
+
+module.exports = { User, Auction };
+
+// server.js - Express Server with New Routes
+const express = require('express');
+const { User, Auction } = require('./models');
+const mongoose = require('./db');
+const bcrypt = require('bcrypt');
+const app = express();
+
+app.use(express.json());
+
+// Route to delete an auction
+app.delete('/auction/:id', async (req, res) => {
+  try {
+    await Auction.findByIdAndDelete(req.params.id);
+    res.send({ message: 'Auction deleted successfully' });
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+// Route to edit an auction
+app.put('/auction/:id', async (req, res) => {
+  try {
+    const updatedAuction = await Auction.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.send(updatedAuction);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+app.listen(3000, () => console.log('Server running on port 3000'));
